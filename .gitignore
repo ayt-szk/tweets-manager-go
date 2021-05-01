@@ -1,0 +1,7 @@
+tmp/inputs/*
+tmp/outputs/*
+tmp/logs/*
+
+!tmp/inputs/.gitkeep
+!tmp/outputs/.gitkeep
+!tmp/logs/.gitkeep
