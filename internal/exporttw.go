@@ -9,12 +9,12 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ayt-szk/tweets-manager-go/pkg/domain/models"
 )
 
 func ExportTweets() error {
-	fmt.Println("export tweets")
 	if err := createTweetJsonFile(); err != nil {
 		log.Printf("Create json file error: %#v", err)
 		return err
@@ -94,27 +94,39 @@ func exportCsv() error {
 	w := csv.NewWriter(csvFile)
 	w.Comma = ','
 
+	header := []string{
+		"ID_STR",
+		"FULL_TEXT",
+		"HASHTAGS",
+		"USER_MENTIONS",
+		"RETWEET_COUNT",
+		"FAVORITE_COUNT",
+		"CREATE_AT",
+	}
+	w.Write(header)
+
 	for _, t := range tweets {
-		var row []string
-		row = append(row, t.Tweet.ID)
-		row = append(row, t.Tweet.IDStr)
-		row = append(row, t.Tweet.Source)
-		row = append(row, convNewline(t.Tweet.FullText, " "))
-		// row = append(row, t.Tweet.Retweeted)
-		row = append(row, t.Tweet.RetweetCount)
-		// row = append(row, t.Tweet.Favorited)
-		row = append(row, t.Tweet.FavoriteCount)
-		// row = append(row, t.Tweet.Truncated)
-		// row = append(row, t.Tweet.DisplayTextRange)
-		row = append(row, t.Tweet.CreateAt)
-		row = append(row, t.Tweet.Lang)
-		// row = append(row, t.Tweet.Entities.Hashtags)
-		// row = append(row, t.Tweet.Entities.UserMentions)
+
+		idStr := t.Tweet.IDStr
+		fullText := convNewline(t.Tweet.FullText, " ")
+		hashtags := joinHashtags(t.Tweet.Entities.Hashtags)
+		userMentions := joinUserMentions(t.Tweet.Entities.UserMentions)
+		retweetCount := t.Tweet.RetweetCount
+		favoriteCount := t.Tweet.FavoriteCount
+		createAt := convTimeToJst(t.Tweet.CreateAt)
+
+		row := []string{
+			idStr,
+			fullText,
+			hashtags,
+			userMentions,
+			retweetCount,
+			favoriteCount,
+			createAt,
+		}
 
 		w.Write(row)
-		// w.Write()
 	}
-
 	w.Flush()
 
 	return nil
@@ -126,4 +138,43 @@ func convNewline(str, repStr string) string {
 		"\r", repStr,
 		"\n", repStr,
 	).Replace(str)
+}
+
+func convTimeToJst(createAt string) string {
+	layout := "Mon Jan 2 15:04:05 +0000 2006"
+
+	t, err := time.Parse(layout, createAt)
+	if err != nil {
+		return "0000-00-00 00:00:00"
+	}
+
+	// UTC+9時間
+	t = t.Add(9 * time.Hour)
+	jstTime := t.Format("2006-01-02 15:04:05")
+
+	return jstTime
+}
+
+func joinHashtags(hashtags []models.HashtagEntity) string {
+	var arrHashtags []string
+
+	for _, hashtag := range hashtags {
+		h := fmt.Sprintf("#%s", hashtag.Text)
+		arrHashtags = append(arrHashtags, h)
+	}
+	joinedHashtags := strings.Join(arrHashtags, ",")
+
+	return joinedHashtags
+}
+
+func joinUserMentions(userMentions []models.MentionEntity) string {
+	var arrUserMentions []string
+
+	for _, userMention := range userMentions {
+		u := fmt.Sprintf("@%s", userMention.ScreenName)
+		arrUserMentions = append(arrUserMentions, u)
+	}
+	joinedUserMentions := strings.Join(arrUserMentions, ",")
+
+	return joinedUserMentions
 }
