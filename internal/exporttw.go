@@ -21,7 +21,7 @@ func ExportTweets() error {
 	}
 
 	if err := exportCsv(); err != nil {
-		log.Printf("export json file error: %#v", err)
+		log.Printf("export csv file error: %#v", err)
 		return err
 	}
 
@@ -30,9 +30,8 @@ func ExportTweets() error {
 
 func createTweetJsonFile() error {
 	// write tweet.json
-	jsonFile, err := os.Create("tmp/inputs/tweet.json")
+	jsonFile, err := os.OpenFile("tmp/inputs/tweet.json", os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
-		log.Printf("Create file error: %#v", err)
 		return err
 	}
 	defer jsonFile.Close()
@@ -40,7 +39,6 @@ func createTweetJsonFile() error {
 	// read tweet.js
 	jsFile, err := os.Open("tmp/inputs/tweet.js")
 	if err != nil {
-		log.Printf("Open file error: %#v", err)
 		return err
 	}
 	defer jsFile.Close()
@@ -60,7 +58,7 @@ func createTweetJsonFile() error {
 		line := fmt.Sprintf("%s\n", scanner.Text())
 		_, err := jsonFile.WriteString(line)
 		if err != nil {
-			log.Printf("Write file error: %#v", err)
+			return err
 		}
 
 		lineCount++
@@ -74,7 +72,6 @@ func exportCsv() error {
 	// scan tweet.json
 	file, err := ioutil.ReadFile("tmp/inputs/tweet.json")
 	if err != nil {
-		log.Printf("Open file error: %#v", err)
 		return err
 	}
 
@@ -86,7 +83,6 @@ func exportCsv() error {
 
 	csvFile, err := os.Create("tmp/outputs/tweet.csv")
 	if err != nil {
-		log.Printf("Create file error: %#v", err)
 		return err
 	}
 	defer csvFile.Close()
@@ -113,7 +109,10 @@ func exportCsv() error {
 		userMentions := joinUserMentions(t.Tweet.Entities.UserMentions)
 		retweetCount := t.Tweet.RetweetCount
 		favoriteCount := t.Tweet.FavoriteCount
-		createAt := convTimeToJst(t.Tweet.CreateAt)
+		createAt, err := convTimeToJst(t.Tweet.CreateAt)
+		if err != nil {
+			return err
+		}
 
 		row := []string{
 			idStr,
@@ -140,19 +139,19 @@ func convNewline(str, repStr string) string {
 	).Replace(str)
 }
 
-func convTimeToJst(createAt string) string {
+func convTimeToJst(createAt string) (string, error) {
 	layout := "Mon Jan 2 15:04:05 +0000 2006"
 
 	t, err := time.Parse(layout, createAt)
 	if err != nil {
-		return "0000-00-00 00:00:00"
+		return "", err
 	}
 
 	// UTC+9時間
 	t = t.Add(9 * time.Hour)
 	jstTime := t.Format("2006-01-02 15:04:05")
 
-	return jstTime
+	return jstTime, nil
 }
 
 func joinHashtags(hashtags []models.HashtagEntity) string {
